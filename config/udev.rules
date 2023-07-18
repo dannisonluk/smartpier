@@ -1,0 +1,7 @@
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="0482", ATTRS{idProduct}=="5749", MODE="0666"
+
+# Explanation
+# Device: Yawei YAV 8AD PRO USB WIFI, https://www.yoycart.com/Product/550525158044
+# USB device's vendor ID: 0482, product ID: 5749
+# These values can be found by running the command lsusb in the terminal
+# MODE="0666" allows any user to access the USB device.
