@@ -13,10 +13,9 @@ basepath = os.getcwd()
 
 
 class Data:
-    def __init__(self, datetime, vibration_intensity, lasor_intensity=None) -> None:
+    def __init__(self, datetime, vibration_intensity) -> None:
         self.datetime = datetime
         self.vibration_intensity = vibration_intensity
-        self.lasor_intensity = lasor_intensity
 
 
 def receive_usb_data(storage_queue):

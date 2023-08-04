@@ -1,11 +1,15 @@
-import os
-import pandas
-import requests
-import base64
 import logging
+import base64
+import requests
+import pandas
+import os
+from dotenv import load_dotenv
+load_dotenv()
 logging.basicConfig(level=logging.DEBUG)
 
 export_path = os.getcwd()
+
+pierId = 13
 
 '''
     function name: format_data(data: deque(maxlen=1000))
@@ -26,8 +30,8 @@ def format_data(data):
                                temp_data.vibration_intensity])]
             )
             csv_data = pandas.concat([csv_data, temp_row], ignore_index=True)
-            csv_data.columns = ['STM32_DATETIME',
-                                'Accelerometer z-axis/ms^-2']
+        csv_data.columns = ['STM32_DATETIME',
+                            'Accelerometer z-axis/ms^-2']
 
     # if data has lasor_intensity column
     else:
@@ -40,9 +44,9 @@ def format_data(data):
                     temp_data.lasor_intensity)]
             )
             csv_data = pandas.concat([csv_data, temp_row], ignore_index=True)
-            csv_data.columns = ['STM32_DATETIME',
-                                'Accelerometer z-axis/ms^-2',
-                                'Laser Sensor /m']
+        csv_data.columns = ['STM32_DATETIME',
+                            'Accelerometer z-axis/ms^-2',
+                            'Laser Sensor /m']
     return csv_data
 
 
@@ -52,4 +56,21 @@ def export_csv(csv_data, datetime):
     # change the export_path in order to store the file in other director
     export_path = f'{filename}'
     csv_data.to_csv(filename, sep=',', encoding='utf-8', index=False)
+    post_csv(csv_path=export_path,
+             filename=filename, pierId=pierId)
     export_path = os.getcwd()
+
+
+def post_csv(csv_path, filename, pierId):
+    url = os.getenv("SERVER_ENDPOINT")
+    record = open(csv_path, 'rb').read()
+    record = base64.b64encode(record)
+    record = record.decode('utf-8')
+    jsonObj = {'pierId': pierId, 'csvName': filename, '__csvfile': record, }
+    try:
+        x = requests.post(url, json=jsonObj)
+        return_status = x.status_code
+    except:
+        logging.error(f'POST failed, Error Status {return_status}')
+    else:
+        logging.error(f'POST succeded {return_status}')

@@ -7,7 +7,7 @@ from export_csv import format_data, export_csv
 logging.basicConfig(level=logging.DEBUG)
 
 vibration_starttime = datetime.now()
-vibration_threshold = 2.485
+vibration_threshold = 9.63
 lasor_threshold = 0.5
 lsenable = False
 vibration_detected = False
@@ -23,7 +23,8 @@ class Data:
 
 def check_intensity(sensor_data):
     if sensor_data.vibration_intensity > vibration_threshold:
-        logging.debug(f"======== Vibration detected: {sensor_data.vibration_intensity} ========")
+        logging.debug(
+            f"======== Vibration detected: {sensor_data.vibration_intensity} ========")
         global vibration_detected, vibration_starttime
         if not vibration_detected:
             vibration_detected = True
@@ -53,7 +54,11 @@ def monitor_intensity(storage_queue):
                 for _ in range(1, len(storage_queue) - 250):
                     storage_queue.popleft()
             elif len(storage_queue) < 250:
-                logging.warning("======= Not enough data for prior 5 seconds =======")
+                logging.warning(
+                    "======= Not enough data for prior 5 seconds =======")
+                for _ in range(1, 250 - len(storage_queue)):
+                    storage_queue.append(Data(datetime=datetime(1970, 1, 1),
+                                              vibration_intensity=0))
 
         if vibration_detected and vibration_lock and len(storage_queue) == 1000:
             copy_queue = storage_queue.copy()
@@ -63,5 +68,6 @@ def monitor_intensity(storage_queue):
                     copy_queue.pop()
             export_csv(format_data(copy_queue), vibration_starttime)
             storage_queue.clear()
+            logging.debug("########### queue cleared ###########")
             vibration_detected = False
             vibration_lock = False
