@@ -1,0 +1,14 @@
+# Setup everything here for better management
+server:
+  url: "https://smartpier.hkscd.net/SmartPier/servlet/data/BerthingSection/"
+
+pierId: 13
+
+sensor:
+  vid: 0x0482
+  pid: 0x5749
+  threshold:
+    vibration_threshold: 9.63
+    lasor_threshold: 0.5
+  output:
+    directory: "./output_csv/"

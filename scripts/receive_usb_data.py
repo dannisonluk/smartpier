@@ -4,24 +4,33 @@ from datetime import datetime
 
 import pandas as pd
 import usb.core
+import yaml
 
-from monitor_intensity import check_intensity, calculate_vibration_intensity
+from monitor_intensity import check_vibration_intensity, calculate_vibration_intensity
 
-vid = 0x0482
-pid = 0x5749
 basepath = os.getcwd()
+
+with open('./scripts/setting.yaml', 'r') as file:
+    setting_yaml = yaml.safe_load(file)
 
 
 class Data:
-    def __init__(self, datetime, vibration_intensity) -> None:
+    def __init__(self, datetime, vibration_intensity, lasor_intensity=None) -> None:
         self.datetime = datetime
         self.vibration_intensity = vibration_intensity
+        self.lasor_intensity = lasor_intensity
+
+
+'''
+    This is just some setup to receive usb signals and format the signal with date to form a Data object
+'''
 
 
 def receive_usb_data(storage_queue):
     print("run receive_usb_data")
     # detect device
-    device = usb.core.find(idVendor=vid, idProduct=pid)
+    device = usb.core.find(
+        idVendor=setting_yaml['sensor']['vid'], idProduct=setting_yaml['sensor']['pid'])
     if device is None:
         raise ValueError("Device not found")
 
@@ -55,7 +64,7 @@ def receive_usb_data(storage_queue):
         sensor_data = Data(datetime=current_datetime,
                            vibration_intensity=vibration_intensity)
 
-        check_intensity(sensor_data=sensor_data)
+        check_vibration_intensity(sensor_data=sensor_data)
 
         try:
             storage_queue.append(sensor_data)

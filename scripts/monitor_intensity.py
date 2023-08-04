@@ -2,16 +2,24 @@
 import logging
 from datetime import datetime
 
+import yaml
+
 from export_csv import format_data, export_csv
 
 logging.basicConfig(level=logging.DEBUG)
 
+
+with open('./scripts/setting.yaml', 'r') as file:
+    setting_yaml = yaml.safe_load(file)
+
 vibration_starttime = datetime.now()
-vibration_threshold = 9.63
-lasor_threshold = 0.5
 lsenable = False
 vibration_detected = False
 vibration_lock = False
+
+'''
+    This is just a data class
+'''
 
 
 class Data:
@@ -21,8 +29,14 @@ class Data:
         self.lasor_intensity = lasor_intensity
 
 
-def check_intensity(sensor_data):
-    if sensor_data.vibration_intensity > vibration_threshold:
+'''
+    control function:
+        when the vibration is received, it locks the period +-{20}seconds preventing to create a new csv within this time period 
+'''
+
+
+def check_vibration_intensity(sensor_data):
+    if sensor_data.vibration_intensity > setting_yaml['sensor']['threshold']['vibration_threshold']:
         logging.debug(
             f"======== Vibration detected: {sensor_data.vibration_intensity} ========")
         global vibration_detected, vibration_starttime
@@ -42,6 +56,14 @@ def calculate_lasor_intensity(data):
     return (data[7] * 65536 + data[8] * 256 + data[9]) * 2.95 / 8388607 + 0.05
 
 
+'''
+    called by receive_usb_data function when vibrations are received
+    if vibration is received within the first {5 / 10} seconds that the program starts,
+        fill the first part with epoc and vibration_intensity=0
+    append the remaining {15 / 20} seconds after the first vibration is recieved
+'''
+
+
 def monitor_intensity(storage_queue):
     while True:
         global vibration_detected, vibration_starttime, vibration_lock
@@ -57,8 +79,8 @@ def monitor_intensity(storage_queue):
                 logging.warning(
                     "======= Not enough data for prior 5 seconds =======")
                 for _ in range(1, 250 - len(storage_queue)):
-                    storage_queue.append(Data(datetime=datetime(1970, 1, 1),
-                                              vibration_intensity=0))
+                    storage_queue.appendleft(Data(datetime=datetime(1970, 1, 1),
+                                                  vibration_intensity=0))
 
         if vibration_detected and vibration_lock and len(storage_queue) == 1000:
             copy_queue = storage_queue.copy()
