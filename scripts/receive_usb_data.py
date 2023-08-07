@@ -4,33 +4,25 @@ from datetime import datetime
 
 import pandas as pd
 import usb.core
-import yaml
+import time
 
-from monitor_intensity import check_vibration_intensity, calculate_vibration_intensity
+from monitor_intensity import check_intensity, calculate_vibration_intensity
 
+vid = 0x0482
+pid = 0x5749
 basepath = os.getcwd()
-
-with open('./scripts/setting.yaml', 'r') as file:
-    setting_yaml = yaml.safe_load(file)
 
 
 class Data:
-    def __init__(self, datetime, vibration_intensity, lasor_intensity=None) -> None:
+    def __init__(self, datetime, vibration_intensity) -> None:
         self.datetime = datetime
         self.vibration_intensity = vibration_intensity
-        self.lasor_intensity = lasor_intensity
-
-
-'''
-    This is just some setup to receive usb signals and format the signal with date to form a Data object
-'''
 
 
 def receive_usb_data(storage_queue):
     print("run receive_usb_data")
     # detect device
-    device = usb.core.find(
-        idVendor=setting_yaml['sensor']['vid'], idProduct=setting_yaml['sensor']['pid'])
+    device = usb.core.find(idVendor=vid, idProduct=pid)
     if device is None:
         raise ValueError("Device not found")
 
@@ -53,9 +45,9 @@ def receive_usb_data(storage_queue):
     sensor_data = pd.DataFrame()
 
     while True:
-        # data only fetch vibratoin records at this stage
+        # data only fetch vibratoin records at this stage. wait at most 100 milliseconds for one read, else system booms
         data = device.read(endpoint.bEndpointAddress,
-                           endpoint.wMaxPacketSize, timeout=1000)
+                           endpoint.wMaxPacketSize, timeout=100)
 
         current_datetime = datetime.today()
         vibration_intensity = calculate_vibration_intensity(
@@ -64,10 +56,15 @@ def receive_usb_data(storage_queue):
         sensor_data = Data(datetime=current_datetime,
                            vibration_intensity=vibration_intensity)
 
-        check_vibration_intensity(sensor_data=sensor_data)
+        check_intensity(sensor_data=sensor_data)
 
+        # add data to queue
         try:
             storage_queue.append(sensor_data)
+        # if queue size == 1000, pop the left most (old data) and append latest
         except IndexError:
             storage_queue.popleft()
             storage_queue.append(sensor_data)
+
+        # tune this for time interval, depends on how fast the machine runs
+        time.sleep(0.02)  # Pause for 20 milliseconds (0.02 seconds)

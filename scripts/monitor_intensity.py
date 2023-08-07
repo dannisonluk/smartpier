@@ -2,24 +2,17 @@
 import logging
 from datetime import datetime
 
-import yaml
-
 from export_csv import format_data, export_csv
 
 logging.basicConfig(level=logging.DEBUG)
 
-
-with open('./scripts/setting.yaml', 'r') as file:
-    setting_yaml = yaml.safe_load(file)
-
 vibration_starttime = datetime.now()
+vibration_threshold = 2.5
+
+lasor_threshold = 0.5
 lsenable = False
 vibration_detected = False
 vibration_lock = False
-
-'''
-    This is just a data class
-'''
 
 
 class Data:
@@ -29,16 +22,10 @@ class Data:
         self.lasor_intensity = lasor_intensity
 
 
-'''
-    control function:
-        when the vibration is received, it locks the period +-{20}seconds preventing to create a new csv within this time period 
-'''
-
-
-def check_vibration_intensity(sensor_data):
-    if sensor_data.vibration_intensity > setting_yaml['sensor']['threshold']['vibration_threshold']:
+def check_intensity(sensor_data):
+    if sensor_data.vibration_intensity > vibration_threshold:
         logging.debug(
-            f"======== Vibration detected: {sensor_data.vibration_intensity} ========")
+            f"======== Vibration detected: {sensor_data.datetime, sensor_data.vibration_intensity} ========")
         global vibration_detected, vibration_starttime
         if not vibration_detected:
             vibration_detected = True
@@ -56,14 +43,6 @@ def calculate_lasor_intensity(data):
     return (data[7] * 65536 + data[8] * 256 + data[9]) * 2.95 / 8388607 + 0.05
 
 
-'''
-    called by receive_usb_data function when vibrations are received
-    if vibration is received within the first {5 / 10} seconds that the program starts,
-        fill the first part with epoc and vibration_intensity=0
-    append the remaining {15 / 20} seconds after the first vibration is recieved
-'''
-
-
 def monitor_intensity(storage_queue):
     while True:
         global vibration_detected, vibration_starttime, vibration_lock
@@ -75,6 +54,10 @@ def monitor_intensity(storage_queue):
             if len(storage_queue) > 250:
                 for _ in range(1, len(storage_queue) - 250):
                     storage_queue.popleft()
+
+            # SPECIAL CASE
+            # if the vibration is recorded right after the program is run,
+            # fill the blanked part with epoch | unix time 1970/1/1 0:0:0
             elif len(storage_queue) < 250:
                 logging.warning(
                     "======= Not enough data for prior 5 seconds =======")
@@ -82,13 +65,16 @@ def monitor_intensity(storage_queue):
                     storage_queue.appendleft(Data(datetime=datetime(1970, 1, 1),
                                                   vibration_intensity=0))
 
+        # this shouldnt happen because the max size of deque is 1000
+        # just for final check
         if vibration_detected and vibration_lock and len(storage_queue) == 1000:
             copy_queue = storage_queue.copy()
             if len(copy_queue) > 1000:
-                # only keep the latest 250 data
+                # only keep 1000 data
                 for _ in range(1, len(copy_queue) - 1000):
                     copy_queue.pop()
             export_csv(format_data(copy_queue), vibration_starttime)
+            # reset status and storage queue
             storage_queue.clear()
             logging.debug("########### queue cleared ###########")
             vibration_detected = False
